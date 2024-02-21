@@ -11,9 +11,7 @@ implementation("io.github.limuyang2:fresco-cronet:1.0.1")
 ## Usage example:
 ```kotlin
     // 1.Create CronetEngine
-    val cronetEngine = CronetEngine.Builder(
-        NativeCronetEngineBuilderImpl(this)
-    )
+    val cronetEngine = CronetEngine.Builder(applicationContext)
     // ... other config
     .build()
 
