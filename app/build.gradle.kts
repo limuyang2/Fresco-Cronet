@@ -45,6 +45,7 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
     implementation(project(":Fresco_Cronet"))
+//    implementation("io.github.limuyang2:fresco-cronet:1.0.1")
     implementation("com.facebook.fresco:fresco:3.1.3")
     implementation("org.chromium.net:cronet-api:119.6045.31")
     implementation("org.chromium.net:cronet-common:119.6045.31")
