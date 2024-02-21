@@ -1,7 +1,12 @@
 # Fresco-Cronet
 使用`Cornet`作为`Fresco`的网络请求库
 
-使用示例:
+## 引入
+```
+implementation("io.github.limuyang2:fresco-cronet:1.0.1")
+```
+
+## 使用示例:
 ```kotlin
     // 1.创建 CronetEngine
     val cronetEngine = CronetEngine.Builder(

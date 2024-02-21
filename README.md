@@ -3,7 +3,12 @@
 
 Using Cornet as Fresco network request library
 
-Usage example:
+## Get
+```
+implementation("io.github.limuyang2:fresco-cronet:1.0.1")
+```
+
+## Usage example:
 ```kotlin
     // 1.Create CronetEngine
     val cronetEngine = CronetEngine.Builder(
