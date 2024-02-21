@@ -17,7 +17,7 @@ class MainActivity : AppCompatActivity() {
 
 
         viewBinding.btnLoad.setOnClickListener {
-
+            viewBinding.draweeView.hierarchy.setFailureImage(R.drawable.ic_launcher_background)
             viewBinding.draweeView.setImageURI("https://pic.rmb.bdstatic.com/bjh/914b8c0f9814b14c5fedeec7ec6615df5813.jpeg")
 
         }

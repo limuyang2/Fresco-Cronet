@@ -11,10 +11,11 @@ import org.chromium.net.CronetEngine
 import org.chromium.net.CronetException
 import org.chromium.net.UrlRequest
 import org.chromium.net.UrlResponseInfo
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.io.PipedInputStream
-import java.io.PipedOutputStream
 import java.nio.ByteBuffer
+import java.nio.channels.Channels
 import java.util.concurrent.Executor
 
 
@@ -25,7 +26,14 @@ import java.util.concurrent.Executor
  */
 class CronetNetworkFetcher(
     private val cronetEngine: CronetEngine,
-    private val callExecutor: Executor = ThreadExecutor.INSTANCE
+    /**
+     * Thread management
+     */
+    private val callExecutor: Executor = ThreadExecutor.INSTANCE,
+    /**
+     * UrlRequest.Builder config
+     */
+    private val config: (UrlRequest.Builder.() -> Unit)? = null
 ) : BaseNetworkFetcher<CronetFetchState>() {
 
     override fun createFetchState(
@@ -35,11 +43,15 @@ class CronetNetworkFetcher(
 
     override fun fetch(fetchState: CronetFetchState, callback: NetworkFetcher.Callback) {
         try {
-            val urlRequest = cronetEngine.newUrlRequestBuilder(
+            val urlRequestBuilder = cronetEngine.newUrlRequestBuilder(
                 fetchState.uri.toString(),
                 UrlRequestCallback(callback),
                 callExecutor
-            ).build()
+            )
+
+            config?.invoke(urlRequestBuilder)
+
+            val urlRequest = urlRequestBuilder.build()
 
             fetchState.context.addCallbacks(callbacks = object : BaseProducerContextCallbacks() {
                 override fun onCancellationRequested() {
@@ -70,7 +82,14 @@ class CronetNetworkFetcher(
 
     private class UrlRequestCallback(private val callback: NetworkFetcher.Callback) :
         UrlRequest.Callback() {
-        private var out: PipedOutputStream = PipedOutputStream()
+        private val mBytesOs = ByteArrayOutputStream()
+        private val mReceiveChannel = Channels.newChannel(mBytesOs)
+
+        private var isFailure = false
+
+        private var canceled = false
+
+        private fun UrlResponseInfo.isSuccess() = httpStatusCode in 200..299
 
         override fun onRedirectReceived(
             request: UrlRequest, info: UrlResponseInfo?, newLocationUrl: String?
@@ -78,8 +97,12 @@ class CronetNetworkFetcher(
             request.followRedirect()
         }
 
-        override fun onResponseStarted(request: UrlRequest, info: UrlResponseInfo?) {
-            request.read(ByteBuffer.allocateDirect(32 * 1024))
+        override fun onResponseStarted(request: UrlRequest, info: UrlResponseInfo) {
+            if (info.isSuccess()) {
+                request.read(ByteBuffer.allocateDirect(32 * 1024))
+            } else {
+                callback.onFailure(IOException("Http code is: ${info.httpStatusCode}"))
+            }
         }
 
         override fun onReadCompleted(
@@ -87,15 +110,16 @@ class CronetNetworkFetcher(
             info: UrlResponseInfo?,
             byteBuffer: ByteBuffer
         ) {
+            if (isFailure || canceled) return
+
             byteBuffer.flip()
 
             try {
-                if (byteBuffer.hasArray()) {
-                    out.write(byteBuffer.array())
-                }
-
+                mReceiveChannel.write(byteBuffer)
             } catch (e: IOException) {
+                isFailure = true
                 callback.onFailure(e)
+                return
             }
             byteBuffer.clear()
             request.read(byteBuffer)
@@ -104,13 +128,23 @@ class CronetNetworkFetcher(
         override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) {
             val contentLength: Int? = info.allHeaders["Content-Length"]?.lastOrNull()?.toIntOrNull()
 
-            callback.onResponse(PipedInputStream(out), contentLength ?: -1)
+            callback.onResponse(ByteArrayInputStream(mBytesOs.toByteArray()), contentLength ?: -1)
         }
 
         override fun onFailed(
             request: UrlRequest?, info: UrlResponseInfo?, error: CronetException?
         ) {
+            isFailure = true
             callback.onFailure(error)
+            mBytesOs.reset()
+            mBytesOs.close()
+        }
+
+        override fun onCanceled(request: UrlRequest?, info: UrlResponseInfo?) {
+            canceled = true
+            callback.onCancellation()
+            mBytesOs.reset()
+            mBytesOs.close()
         }
     }
 
