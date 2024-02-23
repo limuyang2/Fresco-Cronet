@@ -1,5 +1,5 @@
 # Fresco-Cronet
-使用`Cornet`作为`Fresco`的网络请求库
+使用`Cronet`作为`Fresco`的网络请求库
 
 ## 引入
 ```
